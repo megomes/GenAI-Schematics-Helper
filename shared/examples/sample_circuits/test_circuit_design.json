@@ -1,0 +1,205 @@
+{
+  "circuit_info": {
+    "name": "DIY Eurorack Oscillator",
+    "description": "Three-waveform analog oscillator with CV control",
+    "supply_voltage": "\u00b112V",
+    "categories": [
+      "VCO",
+      "Analog",
+      "DIY",
+      "Eurorack"
+    ]
+  },
+  "blocks": [
+    {
+      "id": "exp_conv",
+      "name": "Exponential Converter",
+      "function": "Converts linear V/oct input to exponential current",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "inputs": [
+        {
+          "signal_type": "cv_signal",
+          "name": "V/oct",
+          "required": true,
+          "description": "1V/octave pitch control input"
+        }
+      ],
+      "outputs": [
+        {
+          "signal_type": "cv_signal",
+          "name": "Exp Current",
+          "description": "Exponential current for core"
+        }
+      ],
+      "implementation": "Matched transistor pair with temperature compensation",
+      "how_it_works": "Uses transistor exponential characteristics with thermal compensation",
+      "main_components": [
+        "2N3904 pair",
+        "TL071",
+        "Trimmer 10k",
+        "Trimmer 100k"
+      ],
+      "parameters": {
+        "tempco": "-3.3mV/\u00b0C",
+        "scaling": "18mV/semitone"
+      },
+      "adjustment": "Scale trimmer for 1V/oct, offset trimmer for initial frequency",
+      "test_points": [
+        "V/oct input",
+        "Exp output"
+      ],
+      "troubleshooting": "Check transistor matching and tempco voltage"
+    },
+    {
+      "id": "core",
+      "name": "Oscillator Core",
+      "function": "Triangle/saw core oscillator",
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "inputs": [
+        {
+          "signal_type": "cv_signal",
+          "name": "Exp Current",
+          "required": true,
+          "description": "Current controlling frequency"
+        },
+        {
+          "signal_type": "gate_signal",
+          "name": "Sync",
+          "required": false,
+          "description": "Hard sync input"
+        }
+      ],
+      "outputs": [
+        {
+          "signal_type": "audio_signal",
+          "name": "Triangle",
+          "description": "Triangle wave output"
+        },
+        {
+          "signal_type": "audio_signal",
+          "name": "Saw",
+          "description": "Sawtooth wave output"
+        }
+      ],
+      "implementation": "LM13700 OTA integrator core",
+      "how_it_works": "Current-controlled integrator with comparator feedback",
+      "main_components": [
+        "LM13700",
+        "TL074",
+        "1N4148"
+      ],
+      "parameters": {
+        "freq_range": "0.1Hz-20kHz"
+      },
+      "adjustment": "Core linearity trimmer",
+      "test_points": [
+        "Triangle out",
+        "Comparator out"
+      ]
+    },
+    {
+      "id": "pwm",
+      "name": "PWM Comparator",
+      "function": "Pulse width modulation",
+      "position": {
+        "x": 400,
+        "y": 100
+      },
+      "inputs": [
+        {
+          "signal_type": "audio_signal",
+          "name": "Triangle In",
+          "required": true,
+          "description": "Triangle wave input"
+        },
+        {
+          "signal_type": "cv_signal",
+          "name": "PWM CV",
+          "required": false,
+          "description": "PWM control voltage"
+        }
+      ],
+      "outputs": [
+        {
+          "signal_type": "audio_signal",
+          "name": "Square",
+          "description": "Square wave output"
+        }
+      ],
+      "implementation": "TL074 comparator stage",
+      "how_it_works": "Compares triangle wave with PWM voltage",
+      "main_components": [
+        "TL074"
+      ],
+      "parameters": {
+        "pwm_range": "5-95%"
+      }
+    },
+    {
+      "id": "output",
+      "name": "Output Buffer",
+      "function": "Signal conditioning and buffering",
+      "position": {
+        "x": 600,
+        "y": 0
+      },
+      "inputs": [
+        {
+          "signal_type": "audio_signal",
+          "name": "Waves In",
+          "required": true,
+          "description": "Raw waveform inputs"
+        }
+      ],
+      "outputs": [
+        {
+          "signal_type": "audio_signal",
+          "name": "Final Output",
+          "description": "Buffered \u00b15V output"
+        }
+      ],
+      "implementation": "Op-amp buffer with level scaling",
+      "how_it_works": "Non-inverting buffer with gain adjustment",
+      "main_components": [
+        "TL074",
+        "Trimmer 100k"
+      ],
+      "parameters": {
+        "output_level": "10Vpp"
+      },
+      "adjustment": "Output level trimmer per waveform"
+    }
+  ],
+  "signal_flow": [
+    {
+      "signal_type": "cv_signal",
+      "from_block": "exp_conv",
+      "to_block": "core",
+      "description": "Exponential frequency control current"
+    },
+    {
+      "signal_type": "audio_signal",
+      "from_block": "core",
+      "to_block": "pwm",
+      "description": "Triangle wave for PWM"
+    },
+    {
+      "signal_type": "audio_signal",
+      "from_block": "core",
+      "to_block": "output",
+      "description": "Triangle and saw outputs"
+    },
+    {
+      "signal_type": "audio_signal",
+      "from_block": "pwm",
+      "to_block": "output",
+      "description": "Square wave output"
+    }
+  ]
+}

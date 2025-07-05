@@ -1,0 +1,226 @@
+{
+  "circuit_info": {
+    "name": "1Hz LED Blinker",
+    "description": "Simple LED oscillator circuit that blinks an LED at 1Hz frequency",
+    "supply_voltage": "+5V",
+    "categories": [
+      "oscillator",
+      "LED",
+      "timing"
+    ]
+  },
+  "blocks": [
+    {
+      "id": "power_supply",
+      "name": "5V Power Supply",
+      "function": "Provides stable DC power to the circuit",
+      "position": {
+        "x": 300,
+        "y": 400
+      },
+      "inputs": [],
+      "outputs": [
+        {
+          "signal_type": "power_5v",
+          "name": "VCC",
+          "description": "5V DC supply"
+        },
+        {
+          "signal_type": "ground",
+          "name": "GND",
+          "description": "Ground reference"
+        }
+      ],
+      "implementation": "Voltage regulator or direct 5V source",
+      "how_it_works": "Provides regulated 5V DC power for the oscillator and LED",
+      "keywords": [
+        "power",
+        "supply",
+        "DC"
+      ],
+      "main_components": [
+        "5V power source",
+        "bypass capacitors"
+      ],
+      "parameters": {
+        "output_voltage": "5V",
+        "max_current": "100mA"
+      },
+      "adjustment": "No adjustment needed if using regulated supply",
+      "test_points": [
+        "VCC",
+        "GND"
+      ],
+      "troubleshooting": "Check voltage between VCC and GND should be 5V \u00b10.25V",
+      "alternatives": [
+        {
+          "method": "USB Power",
+          "pros": [
+            "readily available",
+            "stable"
+          ],
+          "cons": [
+            "requires USB port"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "oscillator",
+      "name": "555 Timer Oscillator",
+      "function": "Generates 1Hz square wave",
+      "position": {
+        "x": 200,
+        "y": 150
+      },
+      "inputs": [
+        {
+          "signal_type": "power_5v",
+          "name": "VCC",
+          "required": true,
+          "description": "Power supply input"
+        },
+        {
+          "signal_type": "ground",
+          "name": "GND",
+          "required": true,
+          "description": "Ground reference"
+        }
+      ],
+      "outputs": [
+        {
+          "signal_type": "gate_signal",
+          "name": "OUT",
+          "description": "1Hz square wave output"
+        }
+      ],
+      "implementation": "555 timer in astable configuration",
+      "how_it_works": "RC network with 555 timer creates oscillations at 1Hz",
+      "keywords": [
+        "oscillator",
+        "555",
+        "timer"
+      ],
+      "main_components": [
+        "555 timer IC",
+        "resistors",
+        "capacitor"
+      ],
+      "parameters": {
+        "frequency": "1Hz",
+        "duty_cycle": "50%"
+      },
+      "adjustment": "Adjust timing resistor for precise 1Hz",
+      "test_points": [
+        "Pin 3 output",
+        "Timing capacitor"
+      ],
+      "troubleshooting": "Check timing capacitor charging/discharging with oscilloscope",
+      "alternatives": [
+        {
+          "method": "RC Oscillator",
+          "pros": [
+            "simpler"
+          ],
+          "cons": [
+            "less stable"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "led_driver",
+      "name": "LED Output Stage",
+      "function": "Drives LED with current limiting",
+      "position": {
+        "x": 600,
+        "y": 150
+      },
+      "inputs": [
+        {
+          "signal_type": "gate_signal",
+          "name": "LED_CONTROL",
+          "required": true,
+          "description": "LED control signal input"
+        },
+        {
+          "signal_type": "power_5v",
+          "name": "VCC",
+          "required": true,
+          "description": "Power supply input"
+        },
+        {
+          "signal_type": "ground",
+          "name": "GND",
+          "required": true,
+          "description": "Ground reference"
+        }
+      ],
+      "outputs": [],
+      "implementation": "Current-limiting resistor and LED",
+      "how_it_works": "Resistor limits LED current to safe value, LED blinks with input signal",
+      "keywords": [
+        "LED",
+        "output",
+        "indicator"
+      ],
+      "main_components": [
+        "LED",
+        "current limiting resistor"
+      ],
+      "parameters": {
+        "led_current": "20mA",
+        "resistor_value": "220\u03a9"
+      },
+      "adjustment": "Change resistor value to adjust LED brightness",
+      "test_points": [
+        "LED anode",
+        "LED cathode"
+      ],
+      "troubleshooting": "Measure voltage across LED and current through resistor",
+      "alternatives": [
+        {
+          "method": "Transistor driver",
+          "pros": [
+            "higher current capability"
+          ],
+          "cons": [
+            "more complex"
+          ]
+        }
+      ]
+    }
+  ],
+  "signal_flow": [
+    {
+      "signal_type": "power_5v",
+      "from_block": "power_supply",
+      "to_block": "oscillator",
+      "description": "5V power to oscillator"
+    },
+    {
+      "signal_type": "power_5v",
+      "from_block": "power_supply",
+      "to_block": "led_driver",
+      "description": "5V power to LED driver"
+    },
+    {
+      "signal_type": "ground",
+      "from_block": "power_supply",
+      "to_block": "oscillator",
+      "description": "Ground connection to oscillator"
+    },
+    {
+      "signal_type": "ground",
+      "from_block": "power_supply",
+      "to_block": "led_driver",
+      "description": "Ground connection to LED driver"
+    },
+    {
+      "signal_type": "gate_signal",
+      "from_block": "oscillator",
+      "to_block": "led_driver",
+      "description": "1Hz square wave to LED driver"
+    }
+  ]
+}
