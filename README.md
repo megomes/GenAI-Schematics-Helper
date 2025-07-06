@@ -1,5 +1,13 @@
 # Circuit Design Tool
 
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![React](https://img.shields.io/badge/React-19.1.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://typescriptlang.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.0+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.1.11-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
+[![Vite](https://img.shields.io/badge/Vite-4.5.14-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev)
+[![Status](https://img.shields.io/badge/Status-In_Development-orange?style=for-the-badge)](https://github.com/your-repo)
+
 AI-powered circuit design tool that generates structured circuit designs through conversational AI using Claude API.
 
 ## 🏗️ Project Structure
@@ -41,6 +49,11 @@ circuit-design-tool/
    ```bash
    cp .env.example .env
    # Edit .env and add your ANTHROPIC_API_KEY
+   ```
+
+   ```bash
+   python3 -m venv myenv
+   source myenv/bin/activate
    ```
 
 3. **Run CLI Interface**
