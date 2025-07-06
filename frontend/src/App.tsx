@@ -1,24 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { CpuChipIcon, ArrowLeftIcon, BoltIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { ChatMessage } from './components/ChatMessage';
-import { MessageInput } from './components/MessageInput';
+import { TerminalOutput } from './components/TerminalOutput';
+import { CommandInput } from './components/CommandInput';
 import { CircuitVisualization } from './components/CircuitVisualization';
-import { Button } from './components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
-import { Badge } from './components/ui/badge';
-import { ScrollArea } from './components/ui/scroll-area';
-import { Separator } from './components/ui/separator';
 import { circuitApi } from './lib/api';
 
-interface Message {
+interface TerminalLine {
   id: string;
   content: string;
-  isUser: boolean;
+  type: 'command' | 'output' | 'error' | 'system';
   timestamp: Date;
 }
 
 function App() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,49 +20,115 @@ function App() {
   const [showVisualization, setShowVisualization] = useState(false);
   const [circuitDesign, setCircuitDesign] = useState<any>(null);
   const [isGeneratingCircuit, setIsGeneratingCircuit] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const terminalEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [terminalLines]);
 
-  const addMessage = (content: string, isUser: boolean) => {
-    const newMessage: Message = {
+  useEffect(() => {
+    // Welcome message
+    addTerminalLine('Circuit Design Terminal v1.0.0', 'system');
+    addTerminalLine('Type "help" for available commands', 'system');
+    addTerminalLine('Ready to design your circuit...', 'system');
+  }, []);
+
+  const addTerminalLine = (content: string, type: TerminalLine['type']) => {
+    const newLine: TerminalLine = {
       id: Date.now().toString(),
       content,
-      isUser,
+      type,
       timestamp: new Date(),
     };
-    setMessages(prev => [...prev, newMessage]);
+    setTerminalLines(prev => [...prev, newLine]);
   };
 
-  const handleSendMessage = async (message: string) => {
-    if (!message.trim()) return;
+  const handleCommand = async (command: string) => {
+    if (!command.trim()) return;
 
-    addMessage(message, true);
+    addTerminalLine(`$ ${command}`, 'command');
     setIsLoading(true);
     setError(null);
 
-    try {
+    // Handle built-in commands
+    if (command.toLowerCase() === 'help') {
+      addTerminalLine('Available commands:', 'output');
+      addTerminalLine('  help                 - Show this help message', 'output');
+      addTerminalLine('  clear                - Clear terminal', 'output');
+      addTerminalLine('  design <description> - Start circuit design', 'output');
+      addTerminalLine('  generate             - Generate circuit diagram', 'output');
+      addTerminalLine('  visualize            - Show circuit visualization', 'output');
+      addTerminalLine('  reset                - Reset current session', 'output');
+      setIsLoading(false);
+      return;
+    }
+
+    if (command.toLowerCase() === 'clear') {
+      setTerminalLines([]);
+      addTerminalLine('Terminal cleared', 'system');
+      setIsLoading(false);
+      return;
+    }
+
+    if (command.toLowerCase() === 'reset') {
+      handleNewSession();
+      addTerminalLine('Session reset', 'system');
+      setIsLoading(false);
+      return;
+    }
+
+    if (command.toLowerCase() === 'generate') {
       if (!isSessionStarted) {
-        const response = await circuitApi.startSession(message);
+        addTerminalLine('Error: No active design session. Use "design <description>" first.', 'error');
+        setIsLoading(false);
+        return;
+      }
+      await handleGenerateCircuit();
+      return;
+    }
+
+    if (command.toLowerCase() === 'visualize') {
+      if (!circuitDesign) {
+        addTerminalLine('Error: No circuit design available. Use "generate" first.', 'error');
+        setIsLoading(false);
+        return;
+      }
+      setShowVisualization(true);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      if (!isSessionStarted && command.toLowerCase().startsWith('design ')) {
+        const description = command.substring(7).trim();
+        if (!description) {
+          addTerminalLine('Error: Please provide a circuit description.', 'error');
+          setIsLoading(false);
+          return;
+        }
+        const response = await circuitApi.startSession(description);
         setSessionId(response.session_id);
         setIsSessionStarted(true);
-        addMessage(response.agent_response, false);
-      } else {
+        addTerminalLine('Design session started', 'system');
+        addTerminalLine(response.agent_response, 'output');
+      } else if (isSessionStarted) {
         if (!sessionId) {
           throw new Error('No active session');
         }
-        const response = await circuitApi.sendMessage(sessionId, message);
-        addMessage(response.agent_response, false);
+        const response = await circuitApi.sendMessage(sessionId, command);
+        addTerminalLine(response.agent_response, 'output');
+      } else {
+        addTerminalLine('Error: Unknown command. Type "help" for available commands.', 'error');
       }
     } catch (err) {
-      console.error('Error sending message:', err);
-      setError(err instanceof Error ? err.message : 'Failed to send message');
+      console.error('Error processing command:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Command failed';
+      addTerminalLine(`Error: ${errorMsg}`, 'error');
+      setError(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -79,180 +139,105 @@ function App() {
 
     setIsGeneratingCircuit(true);
     setError(null);
+    addTerminalLine('Generating circuit design...', 'system');
 
     try {
       const response = await circuitApi.generateCircuit(sessionId);
       if (response.success && response.circuit_design) {
         setCircuitDesign(response.circuit_design);
-        setShowVisualization(true);
+        addTerminalLine('Circuit generated successfully! Use "visualize" to view.', 'system');
       } else {
-        setError(response.errors?.join(', ') || 'Failed to generate circuit');
+        const errorMsg = response.errors?.join(', ') || 'Failed to generate circuit';
+        addTerminalLine(`Error: ${errorMsg}`, 'error');
+        setError(errorMsg);
       }
     } catch (err) {
       console.error('Error generating circuit:', err);
-      setError(err instanceof Error ? err.message : 'Failed to generate circuit');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to generate circuit';
+      addTerminalLine(`Error: ${errorMsg}`, 'error');
+      setError(errorMsg);
     } finally {
       setIsGeneratingCircuit(false);
     }
   };
 
-  const handleBackToChat = () => {
+  const handleBackToTerminal = () => {
     setShowVisualization(false);
   };
 
   const handleNewSession = () => {
-    setMessages([]);
+    setTerminalLines([]);
     setSessionId(null);
     setIsSessionStarted(false);
     setShowVisualization(false);
     setCircuitDesign(null);
     setError(null);
+    // Re-add welcome message
+    addTerminalLine('Circuit Design Terminal v1.0.0', 'system');
+    addTerminalLine('Type "help" for available commands', 'system');
+    addTerminalLine('Ready to design your circuit...', 'system');
   };
-
-  // Check if should show generate button (at least 2 messages exchanged)
-  const shouldShowGenerateButton = isSessionStarted && messages.length >= 4 && !isLoading;
 
   if (showVisualization && circuitDesign) {
     return (
-      <div className="flex flex-col h-screen bg-gray-50">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="max-w-6xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={handleBackToChat}>
-                <ArrowLeftIcon className="w-5 h-5" />
-              </Button>
-              <div className="flex items-center gap-3">
-                <CpuChipIcon className="w-6 h-6 text-gray-700" />
-                <div>
-                  <h1 className="text-xl font-semibold text-gray-900">Circuit Visualization</h1>
-                  <p className="text-sm text-gray-600">
-                    {circuitDesign.circuit_info?.name || 'Unnamed Circuit'}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <Button variant="outline" onClick={handleNewSession}>
-              New Session
-            </Button>
+      <div className="terminal">
+        <nav>
+          <div className="nav-left">
+            <button className="btn btn-ghost" onClick={handleBackToTerminal}>
+              ← Back to Terminal
+            </button>
           </div>
-        </header>
+          <div className="nav-center">
+            <h1>Circuit Visualization</h1>
+          </div>
+          <div className="nav-right">
+            <button className="btn btn-primary" onClick={handleNewSession}>
+              New Session
+            </button>
+          </div>
+        </nav>
 
-        {/* Visualization Area */}
-        <div className="flex-1">
-          <CircuitVisualization circuitDesign={circuitDesign} />
+        <div className="container">
+          <div className="card">
+            <header>
+              <h2>{circuitDesign.circuit_info?.name || 'Unnamed Circuit'}</h2>
+              <p>{circuitDesign.circuit_info?.description || 'Circuit visualization'}</p>
+            </header>
+            <div className="card-body">
+              <CircuitVisualization circuitDesign={circuitDesign} />
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <CpuChipIcon className="w-8 h-8 text-gray-700" />
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Circuit Design Assistant</h1>
-              <p className="text-sm text-gray-600">AI-powered electronic circuit design</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            {shouldShowGenerateButton && (
-              <Button
-                onClick={handleGenerateCircuit}
-                disabled={isGeneratingCircuit}
-                className="gap-2"
-              >
-                <BoltIcon className="w-4 h-4" />
-                {isGeneratingCircuit ? 'Generating...' : 'Generate Circuit'}
-              </Button>
-            )}
-            {isSessionStarted && (
-              <Button variant="outline" onClick={handleNewSession}>
-                New Session
-              </Button>
-            )}
-          </div>
+    <div className="terminal">
+      <nav>
+        <div className="nav-left">
+          <h1>Circuit Design Terminal</h1>
         </div>
-      </header>
-
-      {/* Chat Area */}
-      <div className="flex-1 flex flex-col">
-        <div className="flex-1 overflow-hidden">
-          <div className="max-w-4xl mx-auto h-full">
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full p-8">
-                <Card className="max-w-md text-center shadow-sm">
-                  <CardHeader className="pb-4">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <CpuChipIcon className="w-8 h-8 text-gray-600" />
-                    </div>
-                    <CardTitle className="text-xl">Welcome to Circuit Design Assistant</CardTitle>
-                    <CardDescription>
-                      Describe the electronic circuit you want to create and I'll help you design it step by step.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      <Badge variant="secondary">Audio</Badge>
-                      <Badge variant="secondary">Synthesizer</Badge>
-                      <Badge variant="secondary">Filter</Badge>
-                      <Badge variant="secondary">Oscillator</Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ) : (
-              <ScrollArea className="h-full">
-                <div className="py-6 space-y-1">
-                  {messages.map((message) => (
-                    <ChatMessage
-                      key={message.id}
-                      message={message.content}
-                      isUser={message.isUser}
-                    />
-                  ))}
-                  {isLoading && (
-                    <ChatMessage
-                      message=""
-                      isUser={false}
-                      isLoading={true}
-                    />
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-              </ScrollArea>
-            )}
-          </div>
+        <div className="nav-right">
+          <button className="btn btn-primary" onClick={handleNewSession}>
+            Reset
+          </button>
         </div>
+      </nav>
 
-        {/* Error Message */}
-        {error && (
-          <>
-            <Separator />
-            <div className="bg-red-50 border-red-200 p-4">
-              <div className="max-w-4xl mx-auto">
-                <div className="flex items-center gap-3 text-red-700">
-                  <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />
-                  <p className="text-sm font-medium">{error}</p>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Message Input */}
-        <MessageInput
-          onSendMessage={handleSendMessage}
-          isLoading={isLoading}
-          placeholder={
-            isSessionStarted
-              ? "Continue the conversation..."
-              : "Describe the circuit you want to create..."
-          }
+      <div className="container">
+        <div className="terminal-window">
+          <TerminalOutput 
+            lines={terminalLines}
+            isLoading={isLoading}
+            error={error}
+          />
+          <div ref={terminalEndRef} />
+        </div>
+        
+        <CommandInput 
+          onCommand={handleCommand}
+          disabled={isLoading}
         />
       </div>
     </div>
